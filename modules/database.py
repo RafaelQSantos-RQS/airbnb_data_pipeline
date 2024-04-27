@@ -2,7 +2,7 @@ import os
 import pandas as pd
 from typing import Literal
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, URL, text
+from sqlalchemy import create_engine, URL, text, exc
 
 
 class PostgreSQL:
@@ -60,19 +60,25 @@ class PostgreSQL:
         Raise:
             Exception: Se ocorrer um erro inesperado durante a criação do banco de dados.
         """
+        try:
+            with self.create_connection() as connection:
+                query_text = f'''
+                CREATE DATABASE {database}
+                    WITH
+                    OWNER = postgres
+                    ENCODING = 'UTF8'
+                    LOCALE_PROVIDER = 'libc'
+                    CONNECTION LIMIT = -1
+                    IS_TEMPLATE = False;
+                '''
+                query_obj = text(query_text)
+                connection.execute(query_obj)
+        except exc.ProgrammingError as e:
+            if 'database \"' + database + '\" already exists' in str(e):
+                print(f"A base de dados '{database}' já existe. Iremos pular a criação.")
+            else:
+                raise Exception(f"An unexpected error occurred while creating database '{database}': {e}")
 
-        with self.create_connection() as connection:
-            query_text = f'''
-            CREATE DATABASE {database}
-                WITH
-                OWNER = postgres
-                ENCODING = 'UTF8'
-                LOCALE_PROVIDER = 'libc'
-                CONNECTION LIMIT = -1
-                IS_TEMPLATE = False;
-            '''
-            query_obj = text(query_text)
-            connection.execute(query_obj)
 
     def create_schema(self,schema_name:str,database:str=None):
         """
@@ -86,12 +92,14 @@ class PostgreSQL:
             Exception: Se ocorrer um erro inesperado durante a criação do schema.
         """
         try:
-            with self.create_connection(database=database) as connection:
-                query_text = f"CREATE SCHEMA {schema_name} AUTHORIZATION {self.user};"
-                query_obj = text(query_text)
-                connection.execute(query_obj)
-        except Exception as e:
-            print(f"Um erro inesperado ocorreu ao criar o schema '{schema_name}': {e}")
+                with self.create_connection(database=database) as connection:
+                    connection.execute(text(f"CREATE SCHEMA {schema_name} AUTHORIZATION {self.user};"))
+                    print(f"Schema '{schema_name}' created successfully!")
+        except exc.ProgrammingError as e:
+            if 'schema \"' + schema_name + '\" already exists' in str(e):
+                print(f"O Schema '{schema_name}' já existe. Iremos pular a criação.")
+            else:
+                raise Exception(f"An unexpected error occurred while creating schema '{schema_name}': {e}")
     
     def insert_dataframe(self,dataframe:pd.DataFrame,table_name:str,schema:str,database:str=None,if_exists:Literal["fail", "replace", "append"] = "append"):
         """
