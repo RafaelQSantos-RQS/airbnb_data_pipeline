@@ -6,6 +6,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 class Landing:
     def __init__(self,landing_path:str) -> None:
+        '''
+        '''
+        os.makedirs(name=landing_path,exist_ok=True) # Cria o diretório 'landing_path', caso ele não exista
         self.landing_path = landing_path
 
     def extract(self,url:list[str]):
@@ -26,7 +29,7 @@ class Landing:
             except requests.RequestException as req:
                 print(f"Erro ao efetuar a requisição na url {url}: {req}")
             except Exception as e:
-                print(f"Erro inesperado ao efetuar a requisição na url {url}: {req}")
+                print(f"Erro inesperado ao efetuar a requisição na url {url}: {e}")
 
         with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(get_data_and_download,link) for link in url]
